@@ -21,6 +21,13 @@ BigNumber::BigNumber(std::string s) {
 
   ConvBcdToBigNumHelper(strSize, bigNumSize, largestr, _m_data);
 
+  auto tt = new char[strSize];
+
+  ConvBigNumToBcdHelper(bigNumSize, strSize, _m_data, tt);
+  for (auto i = 0; i < strSize; i++) tt[i] += '0';
+
+  std::cout << tt << std::endl;
+
 }
 
 bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *sourceData, char *targetData) {
