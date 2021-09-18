@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <cstring>
+#include <regex>
+#include <stdexcept>
 
 static const unsigned short powersOfTen[] = {10,      // 10^1
                                              100,     // 10^2
@@ -13,31 +15,28 @@ static const unsigned short powersOfTen[] = {10,      // 10^1
 BigNumber::BigNumber(std::string s) {
   auto strSize = s.length();
 
-  auto bigNumSize = (2 * static_cast<int>(std::ceil((strSize * 0.208) + 0.062)));
+  std::regex r(R"((\-|\+)?\d+(\.\d+)?)");
 
-  auto largestr = new char[strSize];
-  _m_data = new char[bigNumSize];
-  for (auto i = 0; i < strSize; i++) largestr[i] = s[i] - '0';
+  if (std::regex_match(s, r)) {
+    _m_size = (2 * static_cast<int>(std::ceil((strSize * 0.208) + 0.062)));
 
-  ConvBcdToBigNumHelper(strSize, bigNumSize, largestr, _m_data);
+    auto largestr = new char[strSize];
+    _m_data = new char[_m_size];
+    for (auto i = 0; i < strSize; i++) largestr[i] = s[i] - '0';
 
-  auto tt = new char[strSize];
+    ConvBcdToBigNumHelper(strSize, _m_size, largestr, _m_data);
 
-  ConvBigNumToBcdHelper(bigNumSize, strSize, _m_data, tt);
-  for (auto i = 0; i < strSize; i++) tt[i] += '0';
-
-  std::cout << tt << std::endl;
-
+    ConvBigNumToBcdHelper();
+  } else
+    throw std::runtime_error("Illegal input !!, The input may not be a normal numeric type. ");
 }
 
 bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *sourceData, char *targetData) {
-  // Recast from bytes to unsigned shorts.
   auto targetLengthInShorts = targetLength / 2;
-  unsigned short *targetDataInShorts = (unsigned short *)targetData;
 
-  // Initialize the Big Num to zero.
   auto i = 0;
   std::memset(targetData, 0, targetLength);
+  auto targetDataInShorts = reinterpret_cast<unsigned short *>(targetData);
   auto finalTargetLengthInShorts = 1;
 
   // Ignore leading zeros in BCD. If all zeros, return.
@@ -51,8 +50,8 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
   union {
     unsigned int temp;
     struct {
-      unsigned short remainder; // 余数
-      unsigned short carry;     // 进位
+      unsigned short remainder;  // 余数
+      unsigned short carry;      // 进位
     } tempParts;
   };
 
@@ -100,14 +99,17 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
   return 0;
 }
 
-bool BigNumber::ConvBigNumToBcdHelper(int sourceLength, int targetLength, char *sourceData, char *targetData) {
-  auto sourceLengthInShorts = sourceLength / 2;
-  unsigned short *sourceDataInShorts = (unsigned short *)sourceData;
+bool BigNumber::ConvBigNumToBcdHelper() {
+  auto targetLength = static_cast<int>(std::floor((_m_size / 2 - 0.062) / 0.208));
+  // std::cout <<_m_size << " xx " << xx << " targetLength: " << targetLength << std::endl;
+  auto targetData = new char[targetLength];
+  auto sourceLengthInShorts = _m_size / 2;
+  unsigned short *sourceDataInShorts = (unsigned short *)_m_data;
 
   unsigned short tempSourceDataInShortsBuf[128 / 2];
   unsigned short *tempSourceDataInShorts = tempSourceDataInShortsBuf;
 
-  tempSourceDataInShorts = new unsigned short[sourceLength / 2];
+  tempSourceDataInShorts = new unsigned short[_m_size / 2];
 
   auto i = 0;
   for (i = 0; i < sourceLengthInShorts; i++) tempSourceDataInShorts[i] = sourceDataInShorts[i];
@@ -184,6 +186,10 @@ bool BigNumber::ConvBigNumToBcdHelper(int sourceLength, int targetLength, char *
   }
 
   delete tempSourceDataInShorts;
+
+  for (auto i = 0; i < targetLength; i++) targetData[i] += '0';
+
+  std::cout << targetData << std::endl;
 
   return 0;
 }
