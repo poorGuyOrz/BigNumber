@@ -1,7 +1,6 @@
 #include "BigNumber.h"
 
 #include <cmath>
-#include <cstring>
 #include <regex>
 #include <stdexcept>
 
@@ -15,6 +14,7 @@ static const unsigned short powersOfTen[] = {10,      // 10^1
 BigNumber::BigNumber(std::string s) {
   auto strSize = s.length();
 
+  // check input
   std::regex r(R"((\-|\+)?\d+(\.\d+)?)");
 
   if (std::regex_match(s, r)) {
@@ -95,29 +95,22 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
                 << " = " << targetDataInShorts[ii] << " ";
     std::cout << std::endl;
   }
-
   return 0;
 }
 
-bool BigNumber::ConvBigNumToBcdHelper() {
+std::string BigNumber::ConvBigNumToBcdHelper() const {
   auto targetLength = static_cast<int>(std::floor((_m_size / 2 - 0.062) / 0.208));
   // std::cout <<_m_size << " xx " << xx << " targetLength: " << targetLength << std::endl;
-  auto targetData = new char[targetLength];
+  auto targetData = new char[targetLength + 1];
   auto sourceLengthInShorts = _m_size / 2;
-  unsigned short *sourceDataInShorts = (unsigned short *)_m_data;
+  auto sourceDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
 
-  unsigned short tempSourceDataInShortsBuf[128 / 2];
-  unsigned short *tempSourceDataInShorts = tempSourceDataInShortsBuf;
-
-  tempSourceDataInShorts = new unsigned short[_m_size / 2];
-
-  auto i = 0;
-  for (i = 0; i < sourceLengthInShorts; i++) tempSourceDataInShorts[i] = sourceDataInShorts[i];
+  auto tempSourceDataInShorts = new unsigned short[sourceLengthInShorts];
+  std::copy(sourceDataInShorts, sourceDataInShorts + sourceLengthInShorts, tempSourceDataInShorts);
 
   // Initialize the BCD to zero.
-  for (i = 0; i < targetLength; i++) targetData[i] = 0;
-  char *finalTargetData = targetData + targetLength - 1;
-  auto finalTargetLength = 1;
+  std::memset(targetData, 0, targetLength + 1);
+  char *finalTargetData = targetData + targetLength;
 
   // Ignore trailing zeros in the Big Num. If all zeros, return.
   auto actualSourceLengthInShorts = sourceLengthInShorts;
@@ -125,7 +118,7 @@ bool BigNumber::ConvBigNumToBcdHelper() {
     actualSourceLengthInShorts--;
   if (!actualSourceLengthInShorts) {
     delete tempSourceDataInShorts;
-    return false;
+    return "false";
   }
 
   union {
@@ -142,8 +135,7 @@ bool BigNumber::ConvBigNumToBcdHelper() {
   // representation (which may be less than 4-digits) and append it to the
   // left of the final BCD.
 
-  finalTargetData++;
-  finalTargetLength = 0;
+  auto finalTargetLength = 0;
   while ((actualSourceLengthInShorts != 1) || (tempSourceDataInShorts[actualSourceLengthInShorts - 1] >= 10000)) {
     // Divide the Big Num by 10^4. It is more efficient to insert
     // the division code than to call SimpleDivideHelper();
@@ -162,7 +154,7 @@ bool BigNumber::ConvBigNumToBcdHelper() {
     for (j = 0; j < 4; j++) {
       if (finalTargetLength >= targetLength) {
         delete tempSourceDataInShorts;
-        return false;
+        return "false";
       }
       finalTargetData--;
       finalTargetLength++;
@@ -177,7 +169,7 @@ bool BigNumber::ConvBigNumToBcdHelper() {
   while (remainder) {
     if (finalTargetLength >= targetLength) {
       delete tempSourceDataInShorts;
-      return -1;
+      return "false";
     }
     finalTargetData--;
     finalTargetLength++;
@@ -190,6 +182,156 @@ bool BigNumber::ConvBigNumToBcdHelper() {
   for (auto i = 0; i < targetLength; i++) targetData[i] += '0';
 
   std::cout << targetData << std::endl;
+
+  return targetData;
+}
+
+short BigNumber::AddHelper(int len1, int len2, char *leftData, char *rightData, char *resultData, int &i) {
+  // Recast from bytes to unsigned shorts.
+  unsigned short *leftDataInShorts = (unsigned short *)leftData;
+  unsigned short *rightDataInShorts = (unsigned short *)rightData;
+  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+
+  union {
+    unsigned int temp;
+    struct {
+      unsigned short remainder;
+      unsigned short carry;
+    } tempParts;
+  };
+
+  tempParts.carry = 0;
+  auto len = (len1 > len2) ? len1 : len2;
+  for (auto j = 0; j < len / 2; j++) {
+    int a, b;
+    if (j > len1 / 2)
+      a = 0;
+    else
+      a = leftDataInShorts[j];
+
+    if (j > len2 / 2)
+      b = 0;
+    else
+      b = rightDataInShorts[j];
+    temp = ((unsigned int)a) + b + tempParts.carry;
+    resultDataInShorts[j] = tempParts.remainder;
+  }
+
+  return 0;
+}
+
+short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, char *resultData) {
+  // Recast from bytes to unsigned shorts.
+  unsigned short *leftDataInShorts = (unsigned short *)leftData;
+  unsigned short *rightDataInShorts = (unsigned short *)rightData;
+  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+
+  // Check if left is smaller than right, and
+  // if so, switch left with right.
+  unsigned short *left = leftDataInShorts;
+  unsigned short *right = rightDataInShorts;
+
+  int neg = 0;
+  int j = 0;
+  auto len = (len1 > len2) ? len1 : len2;
+  for (j = 0; j < len; j++) {
+    int a, b;
+    if (j > len1 / 2)
+      a = 0;
+    else
+      a = leftDataInShorts[j];
+
+    if (j > len2 / 2)
+      b = 0;
+    else
+      b = rightDataInShorts[j];
+
+    if (a > b)
+      neg = -1;
+    else if (a < b)
+      neg = 0;
+  }
+
+  if (neg == -1) {
+    left = rightDataInShorts;
+    right = leftDataInShorts;
+  }
+
+  short carry = 0;
+  int temp;
+
+  union {
+    unsigned int temp1;
+    struct {
+      unsigned short remainder;
+      unsigned short filler;
+    } tempParts;
+  };
+
+  for (j = 0; j < len / 2; j++) {
+    int a, b;
+    if (j > len1 / 2)
+      a = 0;
+    else
+      a = leftDataInShorts[j];
+
+    if (j > len2 / 2)
+      b = 0;
+    else
+      b = rightDataInShorts[j];
+    temp = ((int)a) - b + carry;
+    temp1 = temp + (int)UINT16_MAX + 1;  // Note that USHRT_MAX + 1 = 2^16.
+    resultDataInShorts[j] = tempParts.remainder;
+    carry = (temp < 0 ? -1 : 0);
+    std::cout << " left:" << a << " right:" << b << " result: " << resultDataInShorts[j] << std::endl;
+  }
+
+  return neg;
+}
+
+short BigNumber::MulHelper(int resultLength, int leftLength, int rightLength, char *leftData, char *rightData,
+                           char *resultData) {
+  // Recast from bytes to unsigned shorts.
+  unsigned short *leftDataInShorts = (unsigned short *)leftData;
+  unsigned short *rightDataInShorts = (unsigned short *)rightData;
+  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+
+  // Set result to zero.
+  for (int k = 0; k < resultLength / 2; k++) resultDataInShorts[k] = 0;
+
+  // Skip trailing zeros in the left and the right argument
+  // to shorten the nested loop that appears later.
+  int rightEndInShorts = rightLength / 2 - 1;
+  while (!rightDataInShorts[rightEndInShorts] && rightEndInShorts >= 0) rightEndInShorts--;
+  if (rightEndInShorts < 0) return 0;
+
+  int leftEndInShorts = leftLength / 2 - 1;
+  while (!leftDataInShorts[leftEndInShorts] && leftEndInShorts >= 0) leftEndInShorts--;
+  if (leftEndInShorts < 0) return 0;
+
+  // Int64 temp;
+  // unsigned long * remainder = (unsigned long *) &temp;
+  // unsigned long * carry = remainder + 1;
+
+  union {
+    unsigned int temp;
+    struct {
+      unsigned short remainder;
+      unsigned short carry;
+    } tempParts;
+  };
+
+  int pos;
+  for (int j = 0; j <= rightEndInShorts; j++) {
+    tempParts.carry = 0;
+    pos = j;
+    for (int i = 0; i <= leftEndInShorts; i++, pos++) {
+      temp = ((unsigned int)leftDataInShorts[i]) * rightDataInShorts[j] + resultDataInShorts[pos] + tempParts.carry;
+      resultDataInShorts[pos] = tempParts.remainder;
+    }
+
+    if (tempParts.carry) resultDataInShorts[pos] = tempParts.carry;
+  }
 
   return 0;
 }
