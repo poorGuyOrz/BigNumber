@@ -43,14 +43,24 @@ class BigNumber {
     return nb;
   }
 
+  friend BigNumber operator*(BigNumber &a, const BigNumber &b) {
+    auto len = a._m_size + b._m_size;
+    auto data = new char[len];
+    std::memset(data, 0, len);
+    MulHelper(a._m_size, b._m_size, a._m_data, b._m_data, data);
+    BigNumber nb("0");
+    nb._m_data = data;
+    nb._m_size = len;
+    return nb;
+  }
+
   /*
     add:
       Binary addition operation, directly add by bit
   */
   static short AddHelper(int len1, int len2, char *leftData, char *rightData, char *resultData, int &i);
   static short SubHelper(int len1, int len2, char *leftData, char *rightData, char *resultData);
-  static short MulHelper(int resultLength, int leftLength, int rightLength, char *leftData, char *rightData,
-                         char *resultData);
+  static short MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData);
 
  private:
   char *_m_data;

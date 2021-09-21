@@ -90,6 +90,7 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
     index++;
 
     std::cout << "round " << i << " : ";
+    std::cout << std::hex;
     for (int ii = 0; ii < index; ii++)
       std::cout << "DataInShorts[" << ii << "]"
                 << " = " << targetDataInShorts[ii] << " ";
@@ -289,9 +290,9 @@ short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, 
   return neg;
 }
 
-short BigNumber::MulHelper(int resultLength, int leftLength, int rightLength, char *leftData, char *rightData,
-                           char *resultData) {
+short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData) {
   // Recast from bytes to unsigned shorts.
+  auto resultLength = leftLength + rightLength;
   unsigned short *leftDataInShorts = (unsigned short *)leftData;
   unsigned short *rightDataInShorts = (unsigned short *)rightData;
   unsigned short *resultDataInShorts = (unsigned short *)resultData;
