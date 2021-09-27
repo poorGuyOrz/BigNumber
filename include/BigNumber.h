@@ -61,6 +61,8 @@ class BigNumber {
   static short AddHelper(int len1, int len2, char *leftData, char *rightData, char *resultData, int &i);
   static short SubHelper(int len1, int len2, char *leftData, char *rightData, char *resultData);
   static short MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData);
+  static short DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
+                         char *quotientData, char *tempData);
 
  private:
   char *_m_data;

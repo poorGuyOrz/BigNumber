@@ -1,5 +1,7 @@
 #include "BigNumber.h"
 
+#include <limits.h>
+
 #include <cmath>
 #include <regex>
 #include <stdexcept>
@@ -39,10 +41,9 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
   auto targetDataInShorts = reinterpret_cast<unsigned short *>(targetData);
   auto finalTargetLengthInShorts = 1;
 
-  // Ignore leading zeros in BCD. If all zeros, return.
   auto zeros = 0;
   while ((zeros < sourceLength) && !sourceData[zeros]) zeros++;
-  if (zeros == sourceLength) return 1;  // indicate that it is all zeros
+  if (zeros == sourceLength) return 1;
 
   auto actualSourceLength = sourceLength - zeros;
   char *actualSourceData = sourceData + zeros;
@@ -55,14 +56,8 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
     } tempParts;
   };
 
-  // Compute the Big Num as follows. First, chunk up the BCD
-  // string into chunks of 4-digit unsigned short numbers. Iterate
-  // over these chunks, and at each iteration, multiply the current
-  // Big Num by 10^4 and then add the numeric value of this chunk
-  // to it.
   int index = 0;
   for (i = 0; i < actualSourceLength; i += 4) {
-    // Compute the numeric value of the next 4-digit chunk.
     unsigned short temp1 = 0;
     auto j = 0;
     while ((j < 4) && (i + j < actualSourceLength)) {
@@ -71,10 +66,6 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
     }
     unsigned short power = powersOfTen[j - 1];
 
-    // Multiply the previous Big Num by 10^4 and add the value
-    // of the current chunk to it. It is more efficient to insert the
-    // multiplication and addition code here than to call the Helper()
-    // methods.
     temp = ((unsigned int)targetDataInShorts[0]) * power + temp1;
     targetDataInShorts[0] = tempParts.remainder;
     for (j = 1; j < finalTargetLengthInShorts; j++) {
@@ -101,7 +92,6 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
 
 std::string BigNumber::ConvBigNumToBcdHelper() const {
   auto targetLength = static_cast<int>(std::floor((_m_size / 2 - 0.062) / 0.208));
-  // std::cout <<_m_size << " xx " << xx << " targetLength: " << targetLength << std::endl;
   auto targetData = new char[targetLength + 1];
   auto sourceLengthInShorts = _m_size / 2;
   auto sourceDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
@@ -109,11 +99,9 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
   auto tempSourceDataInShorts = new unsigned short[sourceLengthInShorts];
   std::copy(sourceDataInShorts, sourceDataInShorts + sourceLengthInShorts, tempSourceDataInShorts);
 
-  // Initialize the BCD to zero.
   std::memset(targetData, 0, targetLength + 1);
   char *finalTargetData = targetData + targetLength;
 
-  // Ignore trailing zeros in the Big Num. If all zeros, return.
   auto actualSourceLengthInShorts = sourceLengthInShorts;
   while (!tempSourceDataInShorts[actualSourceLengthInShorts - 1] && actualSourceLengthInShorts > 0)
     actualSourceLengthInShorts--;
@@ -129,17 +117,8 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
 
   unsigned short remainder = 0;
 
-  // Compute the final BCD as follows. Keep dividing the Big Num by 10^4
-  // until the quotient becomes less than 10^4. At each iteration, compute
-  // the 4-digit BCD representation of the remainder, and append it to the
-  // left of the final BCD. For the final remainder, compute its BCD
-  // representation (which may be less than 4-digits) and append it to the
-  // left of the final BCD.
-
   auto finalTargetLength = 0;
   while ((actualSourceLengthInShorts != 1) || (tempSourceDataInShorts[actualSourceLengthInShorts - 1] >= 10000)) {
-    // Divide the Big Num by 10^4. It is more efficient to insert
-    // the division code than to call SimpleDivideHelper();
     int j = 0;
     for (j = actualSourceLengthInShorts - 1; j >= 0; j--) {
       temp1[0] = tempSourceDataInShorts[j];
@@ -150,8 +129,6 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
     }
     if (!tempSourceDataInShorts[actualSourceLengthInShorts - 1]) actualSourceLengthInShorts--;
 
-    // Compute the BCD representation of the remainder and append to the
-    // left of the final BCD.
     for (j = 0; j < 4; j++) {
       if (finalTargetLength >= targetLength) {
         delete tempSourceDataInShorts;
@@ -164,8 +141,6 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
     }
   }
 
-  // Compute the BCD representation of the final remainder and append to the
-  // left of the final BCD.
   remainder = tempSourceDataInShorts[0];
   while (remainder) {
     if (finalTargetLength >= targetLength) {
@@ -300,8 +275,6 @@ short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char
   // Set result to zero.
   for (int k = 0; k < resultLength / 2; k++) resultDataInShorts[k] = 0;
 
-  // Skip trailing zeros in the left and the right argument
-  // to shorten the nested loop that appears later.
   int rightEndInShorts = rightLength / 2 - 1;
   while (!rightDataInShorts[rightEndInShorts] && rightEndInShorts >= 0) rightEndInShorts--;
   if (rightEndInShorts < 0) return 0;
@@ -310,7 +283,7 @@ short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char
   while (!leftDataInShorts[leftEndInShorts] && leftEndInShorts >= 0) leftEndInShorts--;
   if (leftEndInShorts < 0) return 0;
 
-  // Int64 temp;
+  // long temp;
   // unsigned long * remainder = (unsigned long *) &temp;
   // unsigned long * carry = remainder + 1;
 
@@ -334,5 +307,102 @@ short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char
     if (tempParts.carry) resultDataInShorts[pos] = tempParts.carry;
   }
 
+  return 0;
+}
+
+short BigNumber::DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
+                           char *quotientData, char *tempData) {
+  int dividendLengthInShorts = dividendLength / 2;
+  int divisorLengthInShorts = divisorLength / 2;
+  unsigned short *divisorDataInShorts = (unsigned short *)divisorData;
+  unsigned short *quotientDataInShorts = (unsigned short *)quotientData;
+
+  char *tempDividendData = tempData;
+  unsigned short *tempDividendDataInShorts = (unsigned short *)tempDividendData;
+  unsigned short *tempDivisorDataInShorts = tempDividendDataInShorts + dividendLengthInShorts + 1;
+  unsigned short *tempDivisorData1InShorts = tempDivisorDataInShorts + divisorLengthInShorts + 1;
+  char *tempDivisorData = (char *)tempDivisorDataInShorts;
+  char *tempDivisorData1 = (char *)tempDivisorData1InShorts;
+
+  if (divisorDataInShorts[divisorLengthInShorts - 1] <= UCHAR_MAX) {  // Note that UCHAR_MAX = 0xFF
+
+    tempDivisorData[0] = 0;
+    int i;
+    for (i = 0; i < divisorLength; i++) tempDivisorData[i + 1] = divisorData[i];
+    tempDivisorData[divisorLength + 1] = 0;
+
+    tempDividendData[0] = 0;
+    for (i = 0; i < dividendLength; i++) tempDividendData[i + 1] = dividendData[i];
+    tempDividendData[dividendLength + 1] = 0;
+
+  } else {
+    int i;
+    // Multiply divisorData by 1 and store in tempDivisorData.
+    for (i = 0; i < divisorLength; i++) tempDivisorData[i] = divisorData[i];
+    tempDivisorDataInShorts[divisorLengthInShorts] = 0;
+
+    // Multiply dividendData by 1 and store in tempDividendData.
+    for (i = 0; i < dividendLength; i++) tempDividendData[i] = dividendData[i];
+    tempDividendDataInShorts[dividendLengthInShorts] = 0;
+  }
+
+  // Set the quotient to zero.
+  int j = 0;
+  for (j = 0; j < dividendLengthInShorts; j++) quotientDataInShorts[j] = 0;
+
+  unsigned short q;
+
+  union {
+    unsigned int temp1;
+    unsigned short temp2[2];
+  };
+
+  union {
+    long temp3;
+    unsigned short temp4[4];
+  };
+
+  int m = dividendLengthInShorts - divisorLengthInShorts;
+  int dividendPosInShorts = dividendLengthInShorts;
+
+  for (j = 0; j <= m; j++) {
+    temp4[3] = 0;
+    temp4[2] = tempDividendDataInShorts[dividendPosInShorts];
+    temp4[1] = tempDividendDataInShorts[dividendPosInShorts - 1];
+    temp4[0] = tempDividendDataInShorts[dividendPosInShorts - 2];
+    temp2[1] = tempDivisorDataInShorts[divisorLengthInShorts - 1];
+    temp2[0] = tempDivisorDataInShorts[divisorLengthInShorts - 2];
+
+    q = (unsigned short)(temp3 / temp1);
+
+    if (q == 0) {
+      if (tempDividendDataInShorts[dividendLengthInShorts - j] == tempDivisorDataInShorts[divisorLengthInShorts - 1])
+
+        q = USHRT_MAX;  // Note that USHRT_MAX is the largest digit in base 2^16.
+    }
+
+    BigNumber::MulHelper(divisorLength + 2, divisorLength, tempDivisorData, (char *)&q, tempDivisorData1);
+
+    int neg = BigNumber::SubHelper(
+        divisorLength + 2, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
+        tempDivisorData1, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
+
+    if (neg) {
+      q--;
+
+      BigNumber::SubHelper(divisorLength + 2, tempDivisorData,
+                           (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
+                           (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
+    }
+
+    quotientDataInShorts[dividendPosInShorts - divisorLengthInShorts] = q;
+
+    dividendPosInShorts--;
+
+  }  // for j
+
+  for (j = 0; j < divisorLengthInShorts; j++) {
+    if (tempDividendDataInShorts[j] != 0) return 1;
+  }
   return 0;
 }
