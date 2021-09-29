@@ -2,14 +2,15 @@
 
 #include "BigNumber.h"
 
-int main(int, char **) {
+int main() {
   // BigNumber a("65535");
-  BigNumber b("1000");
+  BigNumber b("10100");
+  BigNumber a("10100");
   // BigNumber c = a + b;
   // BigNumber d = a - b;
   // BigNumber e = a * b;
 
-  std::cout << b + 2 << " Hello, world!\n";
+  std::cout << (a == b) << std::endl;
 }
 
 /*
@@ -19,6 +20,18 @@ round 44 : DataInShorts[0] = 16997 DataInShorts[1] = 40531 DataInShorts[2] = 631
 DataInShorts[4] = 65414 DataInShorts[5] = 28978 DataInShorts[6] = 57736 DataInShorts[7] = 34413 DataInShorts[8] = 25764
 DataInShorts[9] = 44 DataInShorts[10] = 0 DataInShorts[11] = 0 round 0 : DataInShorts[0] = 1
 
+storage length = ((precision*log2(10) + 1)/16)
+
+1        2
+2        2
+3        2
+4        2
+5        4
+6        4
+7        4
+8        4
+9        2
+10       3
 
 
 123456

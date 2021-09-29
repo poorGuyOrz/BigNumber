@@ -11,24 +11,29 @@ static const unsigned short powersOfTen[] = {10,      // 10^1
                                              1000,    // 10^3
                                              10000};  // 10^4
 
-#define log2(m) (log(m) / log(2))
-
 BigNumber::BigNumber(std::string s) {
   auto strSize = s.length();
 
   // check input
+  //  TODO:
+  //     1. ignore leading zeros, like 0000123 should be 123, 00000 should be 0
+  //     2. ignore tailing zeros in decimal, like 1.234000 should be 1.234
   std::regex r(R"((\-|\+)?\d+(\.\d+)?)");
 
   if (std::regex_match(s, r)) {
-    _m_size = (2 * static_cast<int>(std::ceil((strSize * 0.208) + 0.062)));
+    // auto x = (2 * static_cast<int>(std::ceil((strSize * 0.208) + 0.062)));
+    _m_size = ((strSize * std::log2(10) + 1) / 16);
+
+    auto sizeInchars = 2 * static_cast<int>(std::ceil(_m_size));
+
+    std::cout << "strSize:" << strSize << " sizeInchars:" << sizeInchars << std::endl;
 
     auto largestr = new char[strSize];
-    _m_data = new char[_m_size];
+    _m_data = new char[sizeInchars];
     for (auto i = 0; i < strSize; i++) largestr[i] = s[i] - '0';
 
-    ConvBcdToBigNumHelper(strSize, _m_size, largestr, _m_data);
+    ConvBcdToBigNumHelper(strSize, sizeInchars, largestr, _m_data);
 
-    ConvBigNumToBcdHelper();
   } else
     throw std::runtime_error("Illegal input !!, The input may not be a normal numeric type. ");
 }
@@ -46,12 +51,13 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
   auto targetDataInShorts = reinterpret_cast<unsigned short *>(targetData);
   auto finalTargetLengthInShorts = 1;
 
-  auto zeros = 0;
-  while ((zeros < sourceLength) && !sourceData[zeros]) zeros++;
-  if (zeros == sourceLength) return 1;
+  if (sourceLength == 1 && sourceData[0] == 0) {
+    targetDataInShorts = 0;
+    return true;
+  }
 
-  auto actualSourceLength = sourceLength - zeros;
-  char *actualSourceData = sourceData + zeros;
+  auto actualSourceLength = sourceLength;
+  char *actualSourceData = sourceData;
 
   union {
     unsigned int temp;
@@ -96,9 +102,14 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *
 }
 
 std::string BigNumber::ConvBigNumToBcdHelper() const {
-  auto targetLength = static_cast<int>(std::floor((_m_size / 2 - 0.062) / 0.208));
+  // auto targetLength = static_cast<int>(std::floor((_m_size / 2 - 0.062) / 0.208));
+
+  auto targetLength = static_cast<int>(std::round((_m_size * 16 - 1) * std::log10(2)));
+
+  std::cout << "_m_size: " << _m_size << " targetLength: " << targetLength << std::endl;
+  auto sizeInchars = 2 * static_cast<int>(std::ceil(_m_size));
   auto targetData = new char[targetLength + 1];
-  auto sourceLengthInShorts = _m_size / 2;
+  auto sourceLengthInShorts = sizeInchars / 2;
   auto sourceDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
 
   auto tempSourceDataInShorts = new unsigned short[sourceLengthInShorts];
@@ -107,13 +118,13 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
   std::memset(targetData, 0, targetLength + 1);
   char *finalTargetData = targetData + targetLength;
 
-  auto actualSourceLengthInShorts = sourceLengthInShorts;
-  while (!tempSourceDataInShorts[actualSourceLengthInShorts - 1] && actualSourceLengthInShorts > 0)
-    actualSourceLengthInShorts--;
-  if (!actualSourceLengthInShorts) {
+  // Ignore trailing zeros in the Big Num. If all zeros, return.
+  if (sourceLengthInShorts == 1 && tempSourceDataInShorts[0] == 0) {
     delete tempSourceDataInShorts;
-    return "false";
+    return "0";
   }
+
+  auto actualSourceLengthInShorts = sourceLengthInShorts;
 
   union {
     unsigned int temp;
@@ -167,153 +178,152 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
   return targetData;
 }
 
-BigNumber BigNumber::AddHelper(const BigNumber &adder) {
-  // Recast from bytes to unsigned shorts.
-  auto len = std::max(_m_size, adder._m_size) + 1;
-  auto data = new char[len];
-  std::memset(data, 0, len);
-  auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
-  auto rightDataInShorts = reinterpret_cast<unsigned short *>(adder._m_data);
-  auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
+// BigNumber BigNumber::AddHelper(const BigNumber &adder) {
+//   // Recast from bytes to unsigned shorts.
+//   auto len = std::max(_m_size, adder._m_size) + 1;
+//   auto data = new char[len];
+//   std::memset(data, 0, len);
+//   auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
+//   auto rightDataInShorts = reinterpret_cast<unsigned short *>(adder._m_data);
+//   auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
 
-  union {
-    unsigned int temp;
-    struct {
-      unsigned short remainder;
-      unsigned short carry;
-    } tempParts;
-  };
+//   union {
+//     unsigned int temp;
+//     struct {
+//       unsigned short remainder;
+//       unsigned short carry;
+//     } tempParts;
+//   };
 
-  tempParts.carry = 0;
-  for (auto j = 0; j < len / 2; j++) {
-    int a, b;
-    if (j > _m_size / 2)
-      a = 0;
-    else
-      a = leftDataInShorts[j];
+//   tempParts.carry = 0;
+//   for (auto j = 0; j < len / 2; j++) {
+//     int a, b;
+//     if (j > _m_size / 2)
+//       a = 0;
+//     else
+//       a = leftDataInShorts[j];
 
-    if (j > adder._m_size / 2)
-      b = 0;
-    else
-      b = rightDataInShorts[j];
-    temp = ((unsigned int)a) + b + tempParts.carry;
-    resultDataInShorts[j] = tempParts.remainder;
-  }
+//     if (j > adder._m_size / 2)
+//       b = 0;
+//     else
+//       b = rightDataInShorts[j];
+//     temp = ((unsigned int)a) + b + tempParts.carry;
+//     resultDataInShorts[j] = tempParts.remainder;
+//   }
 
-  return BigNumber(len, data);
-}
+//   return BigNumber(len, data);
+// }
 
-BigNumber BigNumber::SubHelper(const BigNumber &suber) {
-  // Recast from bytes to unsigned shorts.
-  auto len = std::max(_m_size, suber._m_size) + 1;
-  auto data = new char[len];
-  std::memset(data, 0, len);
-  auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
-  auto rightDataInShorts = reinterpret_cast<unsigned short *>(suber._m_data);
-  auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
+// BigNumber BigNumber::SubHelper(const BigNumber &suber) {
+//   // Recast from bytes to unsigned shorts.
+//   auto len = std::max(_m_size, suber._m_size) + 1;
+//   auto data = new char[len];
+//   std::memset(data, 0, len);
+//   auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
+//   auto rightDataInShorts = reinterpret_cast<unsigned short *>(suber._m_data);
+//   auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
 
-  // Check if left is smaller than right, and
-  // if so, switch left with right.
-  unsigned short *left = leftDataInShorts;
-  unsigned short *right = rightDataInShorts;
+//   // Check if left is smaller than right, and
+//   // if so, switch left with right.
+//   unsigned short *left = leftDataInShorts;
+//   unsigned short *right = rightDataInShorts;
 
-  int neg = 0;
-  int j = 0;
-  for (j = 0; j < len; j++) {
-    int a, b;
-    if (j > _m_size / 2)
-      a = 0;
-    else
-      a = leftDataInShorts[j];
+//   int neg = 0;
+//   int j = 0;
+//   for (j = 0; j < len; j++) {
+//     int a, b;
+//     if (j > _m_size / 2)
+//       a = 0;
+//     else
+//       a = leftDataInShorts[j];
 
-    if (j > suber._m_size / 2)
-      b = 0;
-    else
-      b = rightDataInShorts[j];
+//     if (j > suber._m_size / 2)
+//       b = 0;
+//     else
+//       b = rightDataInShorts[j];
 
-    if (a > b)
-      neg = -1;
-    else if (a < b)
-      neg = 0;
-  }
+//     if (a > b)
+//       neg = -1;
+//     else if (a < b)
+//       neg = 0;
+//   }
 
-  if (neg == -1) {
-    left = rightDataInShorts;
-    right = leftDataInShorts;
-  }
+//   if (neg == -1) {
+//     left = rightDataInShorts;
+//     right = leftDataInShorts;
+//   }
 
-  short carry = 0;
-  int temp;
+//   short carry = 0;
+//   int temp;
 
-  union {
-    unsigned int temp1;
-    struct {
-      unsigned short remainder;
-      unsigned short filler;
-    } tempParts;
-  };
+//   union {
+//     unsigned int temp1;
+//     struct {
+//       unsigned short remainder;
+//       unsigned short filler;
+//     } tempParts;
+//   };
 
-  for (j = 0; j < len / 2; j++) {
-    int a, b;
-    if (j > _m_size / 2)
-      a = 0;
-    else
-      a = leftDataInShorts[j];
+//   for (j = 0; j < len / 2; j++) {
+//     int a, b;
+//     if (j > _m_size / 2)
+//       a = 0;
+//     else
+//       a = leftDataInShorts[j];
 
-    if (j > suber._m_size / 2)
-      b = 0;
-    else
-      b = rightDataInShorts[j];
-    temp = ((int)a) - b + carry;
-    temp1 = temp + (int)UINT16_MAX + 1;  // Note that USHRT_MAX + 1 = 2^16.
-    resultDataInShorts[j] = tempParts.remainder;
-    carry = (temp < 0 ? -1 : 0);
-    std::cout << " left:" << a << " right:" << b << " result: " << resultDataInShorts[j] << std::endl;
-  }
+//     if (j > suber._m_size / 2)
+//       b = 0;
+//     else
+//       b = rightDataInShorts[j];
+//     temp = ((int)a) - b + carry;
+//     temp1 = temp + (int)UINT16_MAX + 1;  // Note that USHRT_MAX + 1 = 2^16.
+//     resultDataInShorts[j] = tempParts.remainder;
+//     carry = (temp < 0 ? -1 : 0);
+//     std::cout << " left:" << a << " right:" << b << " result: " << resultDataInShorts[j] << std::endl;
+//   }
 
-  return BigNumber(len, data);
-}
+//   return BigNumber(len, data);
+// }
 
-short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData) {
-  // Recast from bytes to unsigned shorts.
-  auto resultLength = leftLength + rightLength;
-  unsigned short *leftDataInShorts = (unsigned short *)leftData;
-  unsigned short *rightDataInShorts = (unsigned short *)rightData;
-  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+// short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData) {
+//   // Recast from bytes to unsigned shorts.
+//   auto resultLength = leftLength + rightLength;
+//   auto leftDataInShorts = reinterpret_cast<unsigned short *>(leftData);
+//   auto rightDataInShorts = reinterpret_cast<unsigned short *>(rightData);
+//   auto resultDataInShorts = reinterpret_cast<unsigned short *>(resultData);
 
-  // Set result to zero.
-  for (int k = 0; k < resultLength / 2; k++) resultDataInShorts[k] = 0;
+//   std::memset(resultData, 0, resultLength);
 
-  int rightEndInShorts = rightLength / 2 - 1;
-  while (!rightDataInShorts[rightEndInShorts] && rightEndInShorts >= 0) rightEndInShorts--;
-  if (rightEndInShorts < 0) return 0;
+//   int rightEndInShorts = rightLength / 2 - 1;
+//   while (!rightDataInShorts[rightEndInShorts] && rightEndInShorts >= 0) rightEndInShorts--;
+//   if (rightEndInShorts < 0) return 0;
 
-  int leftEndInShorts = leftLength / 2 - 1;
-  while (!leftDataInShorts[leftEndInShorts] && leftEndInShorts >= 0) leftEndInShorts--;
-  if (leftEndInShorts < 0) return 0;
+//   int leftEndInShorts = leftLength / 2 - 1;
+//   while (!leftDataInShorts[leftEndInShorts] && leftEndInShorts >= 0) leftEndInShorts--;
+//   if (leftEndInShorts < 0) return 0;
 
-  union {
-    unsigned int temp;
-    struct {
-      unsigned short remainder;
-      unsigned short carry;
-    } tempParts;
-  };
+//   union {
+//     unsigned int temp;
+//     struct {
+//       unsigned short remainder;
+//       unsigned short carry;
+//     } tempParts;
+//   };
 
-  int pos;
-  for (int j = 0; j <= rightEndInShorts; j++) {
-    tempParts.carry = 0;
-    pos = j;
-    for (int i = 0; i <= leftEndInShorts; i++, pos++) {
-      temp = ((unsigned int)leftDataInShorts[i]) * rightDataInShorts[j] + resultDataInShorts[pos] + tempParts.carry;
-      resultDataInShorts[pos] = tempParts.remainder;
-    }
+//   int pos;
+//   for (int j = 0; j <= rightEndInShorts; j++) {
+//     tempParts.carry = 0;
+//     pos = j;
+//     for (int i = 0; i <= leftEndInShorts; i++, pos++) {
+//       temp = ((unsigned int)leftDataInShorts[i]) * rightDataInShorts[j] + resultDataInShorts[pos] + tempParts.carry;
+//       resultDataInShorts[pos] = tempParts.remainder;
+//     }
 
-    if (tempParts.carry) resultDataInShorts[pos] = tempParts.carry;
-  }
+//     if (tempParts.carry) resultDataInShorts[pos] = tempParts.carry;
+//   }
 
-  return 0;
-}
+//   return 0;
+// }
 
 // short BigNumber::DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
 //                            char *quotientData, char *tempData) {
