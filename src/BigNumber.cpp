@@ -33,6 +33,11 @@ BigNumber::BigNumber(std::string s) {
     throw std::runtime_error("Illegal input !!, The input may not be a normal numeric type. ");
 }
 
+BigNumber::BigNumber(long long l) : BigNumber(std::to_string(l)) {}
+// BigNumber::BigNumber(long long l) { new (this) BigNumber(std::to_string(l)); }
+
+BigNumber::BigNumber(int l, char *s) : _m_size(l), _m_data(s) {}
+
 bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *sourceData, char *targetData) {
   auto targetLengthInShorts = targetLength / 2;
 
@@ -162,11 +167,14 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
   return targetData;
 }
 
-short BigNumber::AddHelper(int len1, int len2, char *leftData, char *rightData, char *resultData, int &i) {
+BigNumber BigNumber::AddHelper(const BigNumber &adder) {
   // Recast from bytes to unsigned shorts.
-  unsigned short *leftDataInShorts = (unsigned short *)leftData;
-  unsigned short *rightDataInShorts = (unsigned short *)rightData;
-  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+  auto len = std::max(_m_size, adder._m_size) + 1;
+  auto data = new char[len];
+  std::memset(data, 0, len);
+  auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
+  auto rightDataInShorts = reinterpret_cast<unsigned short *>(adder._m_data);
+  auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
 
   union {
     unsigned int temp;
@@ -177,15 +185,14 @@ short BigNumber::AddHelper(int len1, int len2, char *leftData, char *rightData, 
   };
 
   tempParts.carry = 0;
-  auto len = (len1 > len2) ? len1 : len2;
   for (auto j = 0; j < len / 2; j++) {
     int a, b;
-    if (j > len1 / 2)
+    if (j > _m_size / 2)
       a = 0;
     else
       a = leftDataInShorts[j];
 
-    if (j > len2 / 2)
+    if (j > adder._m_size / 2)
       b = 0;
     else
       b = rightDataInShorts[j];
@@ -193,14 +200,17 @@ short BigNumber::AddHelper(int len1, int len2, char *leftData, char *rightData, 
     resultDataInShorts[j] = tempParts.remainder;
   }
 
-  return 0;
+  return BigNumber(len, data);
 }
 
-short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, char *resultData) {
+BigNumber BigNumber::SubHelper(const BigNumber &suber) {
   // Recast from bytes to unsigned shorts.
-  unsigned short *leftDataInShorts = (unsigned short *)leftData;
-  unsigned short *rightDataInShorts = (unsigned short *)rightData;
-  unsigned short *resultDataInShorts = (unsigned short *)resultData;
+  auto len = std::max(_m_size, suber._m_size) + 1;
+  auto data = new char[len];
+  std::memset(data, 0, len);
+  auto leftDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
+  auto rightDataInShorts = reinterpret_cast<unsigned short *>(suber._m_data);
+  auto resultDataInShorts = reinterpret_cast<unsigned short *>(data);
 
   // Check if left is smaller than right, and
   // if so, switch left with right.
@@ -209,15 +219,14 @@ short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, 
 
   int neg = 0;
   int j = 0;
-  auto len = (len1 > len2) ? len1 : len2;
   for (j = 0; j < len; j++) {
     int a, b;
-    if (j > len1 / 2)
+    if (j > _m_size / 2)
       a = 0;
     else
       a = leftDataInShorts[j];
 
-    if (j > len2 / 2)
+    if (j > suber._m_size / 2)
       b = 0;
     else
       b = rightDataInShorts[j];
@@ -246,12 +255,12 @@ short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, 
 
   for (j = 0; j < len / 2; j++) {
     int a, b;
-    if (j > len1 / 2)
+    if (j > _m_size / 2)
       a = 0;
     else
       a = leftDataInShorts[j];
 
-    if (j > len2 / 2)
+    if (j > suber._m_size / 2)
       b = 0;
     else
       b = rightDataInShorts[j];
@@ -262,7 +271,7 @@ short BigNumber::SubHelper(int len1, int len2, char *leftData, char *rightData, 
     std::cout << " left:" << a << " right:" << b << " result: " << resultDataInShorts[j] << std::endl;
   }
 
-  return neg;
+  return BigNumber(len, data);
 }
 
 short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData) {
@@ -282,10 +291,6 @@ short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char
   int leftEndInShorts = leftLength / 2 - 1;
   while (!leftDataInShorts[leftEndInShorts] && leftEndInShorts >= 0) leftEndInShorts--;
   if (leftEndInShorts < 0) return 0;
-
-  // long temp;
-  // unsigned long * remainder = (unsigned long *) &temp;
-  // unsigned long * carry = remainder + 1;
 
   union {
     unsigned int temp;
@@ -310,99 +315,99 @@ short BigNumber::MulHelper(int leftLength, int rightLength, char *leftData, char
   return 0;
 }
 
-short BigNumber::DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
-                           char *quotientData, char *tempData) {
-  int dividendLengthInShorts = dividendLength / 2;
-  int divisorLengthInShorts = divisorLength / 2;
-  unsigned short *divisorDataInShorts = (unsigned short *)divisorData;
-  unsigned short *quotientDataInShorts = (unsigned short *)quotientData;
+// short BigNumber::DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
+//                            char *quotientData, char *tempData) {
+//   int dividendLengthInShorts = dividendLength / 2;
+//   int divisorLengthInShorts = divisorLength / 2;
+//   unsigned short *divisorDataInShorts = (unsigned short *)divisorData;
+//   unsigned short *quotientDataInShorts = (unsigned short *)quotientData;
 
-  char *tempDividendData = tempData;
-  unsigned short *tempDividendDataInShorts = (unsigned short *)tempDividendData;
-  unsigned short *tempDivisorDataInShorts = tempDividendDataInShorts + dividendLengthInShorts + 1;
-  unsigned short *tempDivisorData1InShorts = tempDivisorDataInShorts + divisorLengthInShorts + 1;
-  char *tempDivisorData = (char *)tempDivisorDataInShorts;
-  char *tempDivisorData1 = (char *)tempDivisorData1InShorts;
+//   char *tempDividendData = tempData;
+//   unsigned short *tempDividendDataInShorts = (unsigned short *)tempDividendData;
+//   unsigned short *tempDivisorDataInShorts = tempDividendDataInShorts + dividendLengthInShorts + 1;
+//   unsigned short *tempDivisorData1InShorts = tempDivisorDataInShorts + divisorLengthInShorts + 1;
+//   char *tempDivisorData = (char *)tempDivisorDataInShorts;
+//   char *tempDivisorData1 = (char *)tempDivisorData1InShorts;
 
-  if (divisorDataInShorts[divisorLengthInShorts - 1] <= UCHAR_MAX) {  // Note that UCHAR_MAX = 0xFF
+//   if (divisorDataInShorts[divisorLengthInShorts - 1] <= UCHAR_MAX) {  // Note that UCHAR_MAX = 0xFF
 
-    tempDivisorData[0] = 0;
-    int i;
-    for (i = 0; i < divisorLength; i++) tempDivisorData[i + 1] = divisorData[i];
-    tempDivisorData[divisorLength + 1] = 0;
+//     tempDivisorData[0] = 0;
+//     int i;
+//     for (i = 0; i < divisorLength; i++) tempDivisorData[i + 1] = divisorData[i];
+//     tempDivisorData[divisorLength + 1] = 0;
 
-    tempDividendData[0] = 0;
-    for (i = 0; i < dividendLength; i++) tempDividendData[i + 1] = dividendData[i];
-    tempDividendData[dividendLength + 1] = 0;
+//     tempDividendData[0] = 0;
+//     for (i = 0; i < dividendLength; i++) tempDividendData[i + 1] = dividendData[i];
+//     tempDividendData[dividendLength + 1] = 0;
 
-  } else {
-    int i;
-    // Multiply divisorData by 1 and store in tempDivisorData.
-    for (i = 0; i < divisorLength; i++) tempDivisorData[i] = divisorData[i];
-    tempDivisorDataInShorts[divisorLengthInShorts] = 0;
+//   } else {
+//     int i;
+//     // Multiply divisorData by 1 and store in tempDivisorData.
+//     for (i = 0; i < divisorLength; i++) tempDivisorData[i] = divisorData[i];
+//     tempDivisorDataInShorts[divisorLengthInShorts] = 0;
 
-    // Multiply dividendData by 1 and store in tempDividendData.
-    for (i = 0; i < dividendLength; i++) tempDividendData[i] = dividendData[i];
-    tempDividendDataInShorts[dividendLengthInShorts] = 0;
-  }
+//     // Multiply dividendData by 1 and store in tempDividendData.
+//     for (i = 0; i < dividendLength; i++) tempDividendData[i] = dividendData[i];
+//     tempDividendDataInShorts[dividendLengthInShorts] = 0;
+//   }
 
-  // Set the quotient to zero.
-  int j = 0;
-  for (j = 0; j < dividendLengthInShorts; j++) quotientDataInShorts[j] = 0;
+//   // Set the quotient to zero.
+//   int j = 0;
+//   for (j = 0; j < dividendLengthInShorts; j++) quotientDataInShorts[j] = 0;
 
-  unsigned short q;
+//   unsigned short q;
 
-  union {
-    unsigned int temp1;
-    unsigned short temp2[2];
-  };
+//   union {
+//     unsigned int temp1;
+//     unsigned short temp2[2];
+//   };
 
-  union {
-    long temp3;
-    unsigned short temp4[4];
-  };
+//   union {
+//     long temp3;
+//     unsigned short temp4[4];
+//   };
 
-  int m = dividendLengthInShorts - divisorLengthInShorts;
-  int dividendPosInShorts = dividendLengthInShorts;
+//   int m = dividendLengthInShorts - divisorLengthInShorts;
+//   int dividendPosInShorts = dividendLengthInShorts;
 
-  for (j = 0; j <= m; j++) {
-    temp4[3] = 0;
-    temp4[2] = tempDividendDataInShorts[dividendPosInShorts];
-    temp4[1] = tempDividendDataInShorts[dividendPosInShorts - 1];
-    temp4[0] = tempDividendDataInShorts[dividendPosInShorts - 2];
-    temp2[1] = tempDivisorDataInShorts[divisorLengthInShorts - 1];
-    temp2[0] = tempDivisorDataInShorts[divisorLengthInShorts - 2];
+//   for (j = 0; j <= m; j++) {
+//     temp4[3] = 0;
+//     temp4[2] = tempDividendDataInShorts[dividendPosInShorts];
+//     temp4[1] = tempDividendDataInShorts[dividendPosInShorts - 1];
+//     temp4[0] = tempDividendDataInShorts[dividendPosInShorts - 2];
+//     temp2[1] = tempDivisorDataInShorts[divisorLengthInShorts - 1];
+//     temp2[0] = tempDivisorDataInShorts[divisorLengthInShorts - 2];
 
-    q = (unsigned short)(temp3 / temp1);
+//     q = (unsigned short)(temp3 / temp1);
 
-    if (q == 0) {
-      if (tempDividendDataInShorts[dividendLengthInShorts - j] == tempDivisorDataInShorts[divisorLengthInShorts - 1])
+//     if (q == 0) {
+//       if (tempDividendDataInShorts[dividendLengthInShorts - j] == tempDivisorDataInShorts[divisorLengthInShorts - 1])
 
-        q = USHRT_MAX;  // Note that USHRT_MAX is the largest digit in base 2^16.
-    }
+//         q = USHRT_MAX;  // Note that USHRT_MAX is the largest digit in base 2^16.
+//     }
 
-    BigNumber::MulHelper(divisorLength + 2, divisorLength, tempDivisorData, (char *)&q, tempDivisorData1);
+//     BigNumber::MulHelper(divisorLength + 2, divisorLength, tempDivisorData, (char *)&q, tempDivisorData1);
 
-    int neg = BigNumber::SubHelper(
-        divisorLength + 2, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
-        tempDivisorData1, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
+//     int neg = BigNumber::SubHelper(
+//         divisorLength + 2, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
+//         tempDivisorData1, (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
 
-    if (neg) {
-      q--;
+//     if (neg) {
+//       q--;
 
-      BigNumber::SubHelper(divisorLength + 2, tempDivisorData,
-                           (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
-                           (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
-    }
+//       BigNumber::SubHelper(divisorLength + 2, tempDivisorData,
+//                            (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts],
+//                            (char *)&tempDividendDataInShorts[dividendPosInShorts - divisorLengthInShorts]);
+//     }
 
-    quotientDataInShorts[dividendPosInShorts - divisorLengthInShorts] = q;
+//     quotientDataInShorts[dividendPosInShorts - divisorLengthInShorts] = q;
 
-    dividendPosInShorts--;
+//     dividendPosInShorts--;
 
-  }  // for j
+//   }  // for j
 
-  for (j = 0; j < divisorLengthInShorts; j++) {
-    if (tempDividendDataInShorts[j] != 0) return 1;
-  }
-  return 0;
-}
+//   for (j = 0; j < divisorLengthInShorts; j++) {
+//     if (tempDividendDataInShorts[j] != 0) return 1;
+//   }
+//   return 0;
+// }

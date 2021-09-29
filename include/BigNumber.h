@@ -6,7 +6,8 @@
 class BigNumber {
  public:
   BigNumber(std::string s);
-  // BigNumber(long long l);
+  BigNumber(long long l);
+  explicit BigNumber(int l, char *s);
   ~BigNumber() {
     if (_m_data) delete _m_data;
   }
@@ -19,35 +20,15 @@ class BigNumber {
     return os;
   }
 
-  friend BigNumber operator+(BigNumber &a, const BigNumber &b) {
-    auto len = (a._m_size > b._m_size) ? a._m_size : b._m_size;
-    auto data = new char[len + 1];
-    std::memset(data, 0, len + 1);
-    int lenr = 0;
-    AddHelper(a._m_size, b._m_size, a._m_data, b._m_data, data, lenr);
-    BigNumber nb("0");
-    nb._m_data = data;
-    nb._m_size = len;
-    return nb;
-  }
+  BigNumber operator+(const BigNumber &b) { return AddHelper(b); }
 
-  friend BigNumber operator-(BigNumber &a, const BigNumber &b) {
-    auto len = (a._m_size > b._m_size) ? a._m_size : b._m_size;
-    auto data = new char[len + 1];
-    std::memset(data, 0, len + 1);
-    int lenr = 0;
-    SubHelper(a._m_size, b._m_size, a._m_data, b._m_data, data);
-    BigNumber nb("0");
-    nb._m_data = data;
-    nb._m_size = len;
-    return nb;
-  }
+  BigNumber operator-(const BigNumber &b) { return SubHelper(b); }
 
-  friend BigNumber operator*(BigNumber &a, const BigNumber &b) {
-    auto len = a._m_size + b._m_size;
+  BigNumber operator*(const BigNumber &b) {
+    auto len = this->_m_size + b._m_size;
     auto data = new char[len];
     std::memset(data, 0, len);
-    MulHelper(a._m_size, b._m_size, a._m_data, b._m_data, data);
+    MulHelper(this->_m_size, b._m_size, this->_m_data, b._m_data, data);
     BigNumber nb("0");
     nb._m_data = data;
     nb._m_size = len;
@@ -58,11 +39,11 @@ class BigNumber {
     add:
       Binary addition operation, directly add by bit
   */
-  static short AddHelper(int len1, int len2, char *leftData, char *rightData, char *resultData, int &i);
-  static short SubHelper(int len1, int len2, char *leftData, char *rightData, char *resultData);
-  static short MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData);
-  static short DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
-                         char *quotientData, char *tempData);
+  BigNumber AddHelper(const BigNumber &b);
+  BigNumber SubHelper(const BigNumber &b);
+  short MulHelper(int leftLength, int rightLength, char *leftData, char *rightData, char *resultData);
+  // static short DivHelper(int dividendLength, int divisorLength, char *dividendData, char *divisorData,
+  //                        char *quotientData, char *tempData);
 
  private:
   char *_m_data;

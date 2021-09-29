@@ -3,15 +3,13 @@
 #include "BigNumber.h"
 
 int main(int, char **) {
-  BigNumber a("123456789123");
-  BigNumber b("127");
-  BigNumber c = a + b;
-  BigNumber d = a - b;
-  BigNumber e = a * b;
+  // BigNumber a("65535");
+  BigNumber b("1000");
+  // BigNumber c = a + b;
+  // BigNumber d = a - b;
+  // BigNumber e = a * b;
 
-  // BigNumber a("4294967295");
-  std::to_string(1000);
-  std::cout << a << " Hello, world!\n";
+  std::cout << b + 2 << " Hello, world!\n";
 }
 
 /*
@@ -136,7 +134,8 @@ DataInShorts[9] = 44 DataInShorts[10] = 0 DataInShorts[11] = 0 round 0 : DataInS
 12 * 4  = 16
 
 00004034534563456345695
-round 16 : DataInShorts[0] = 58975 DataInShorts[1] = 16601 DataInShorts[2] = 35791 DataInShorts[3] = 14333 DataInShorts[4] = 0 
+round 16 : DataInShorts[0] = 58975 DataInShorts[1] = 16601 DataInShorts[2] = 35791 DataInShorts[3] = 14333
+DataInShorts[4] = 0
 * 127
 
 7489825                  = 111 0010 0100 1001 0010 0001    =     114... 18721
