@@ -4,7 +4,7 @@
 #include <cstring>
 #include <iostream>
 
-#define sizeInChar(strSize) ((strSize * std::log2(10) + 1) / 16)
+#define sizeInChar(strSize) (2 * static_cast<int>(std::ceil((strSize * std::log2(10) + 1) / 16)))
 #define sizeInStr(cSize) (static_cast<int>(std::round((cSize * 16 - 1) * std::log10(2))))
 using std::cout;
 using std::endl;
@@ -14,14 +14,15 @@ class BigNumber {
   BigNumber(std::string s);
   BigNumber(long long l);
   explicit BigNumber(int l, const char *s);
+  explicit BigNumber(char *s, int l);
   ~BigNumber() {
     if (_m_data) delete _m_data;
   }
 
   BigNumber(const BigNumber &b) : _m_size(b._m_size) {
     cout << "call copy constructor  " << endl;
-    _m_data = new char[sizeInStr(_m_size)];
-    std::strncpy(_m_data, b._m_data, sizeInStr(_m_size));
+    _m_data = new char[sizeInChar(_m_size)];
+    std::strncpy(_m_data, b._m_data, sizeInChar(_m_size));
   }
 
   BigNumber(BigNumber &&b) : _m_size(b._m_size), _m_data(b._m_data) {
@@ -33,8 +34,8 @@ class BigNumber {
     cout << "call assignment constructor  " << endl;
     if (this != &b) {
       _m_size = b._m_size;
-      _m_data = new char[sizeInStr(_m_size)];
-      std::strncpy(_m_data, b._m_data, sizeInStr(b._m_size));
+      _m_data = new char[sizeInChar(_m_size)];
+      std::strncpy(_m_data, b._m_data, sizeInChar(b._m_size));
     }
     return *this;
   }
@@ -49,7 +50,7 @@ class BigNumber {
     return *this;
   }
 
-  bool operator==(const BigNumber &b) { return std::strcmp(_m_data, b._m_data) == 0; }
+  bool operator==(const BigNumber &b) { return (_m_size == b._m_size && std::strcmp(_m_data, b._m_data) == 0); }
 
   bool ConvBcdToBigNumHelper(int sourceLength, int targetLength, char *sourceData, char *targetData);
   std::string ConvBigNumToBcdHelper() const;
@@ -73,5 +74,5 @@ class BigNumber {
 
  private:
   char *_m_data;
-  double _m_size;
+  int _m_size;
 };

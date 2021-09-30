@@ -6,8 +6,8 @@ BigNumber getone() { return BigNumber("1234"); }
 
 int main() {
   // BigNumber a("65535");
-  // BigNumber b("10100");
-  // BigNumber a("101");
+  BigNumber b("10100");
+  BigNumber a("101");
   // BigNumber c = a + b;
   // BigNumber d = a - b;
   // BigNumber e = a * b;
@@ -15,9 +15,9 @@ int main() {
   // BigNumber c(a);
 
   // 赋值构造
-  // b = getone();
+  b = getone();
 
-  std::cout << "cout : " << BigNumber(100) + BigNumber(200) << std::endl;
+  std::cout << "cout : " << b + a << std::endl;
 }
 
 /*

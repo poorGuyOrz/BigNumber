@@ -12,7 +12,6 @@ static const unsigned short powersOfTen[] = {10,      // 10^1
                                              10000};  // 10^4
 
 BigNumber::BigNumber(int strSize, const char *s) {
-
   // check input
   //  TODO:
   //     1. ignore leading zeros, like 0000123 should be 123, 00000 should be 0
@@ -20,9 +19,8 @@ BigNumber::BigNumber(int strSize, const char *s) {
   std::regex r(R"((\-|\+)?\d+(\.\d+)?)");
 
   if (std::regex_match(std::string(s, strSize), r)) {
-    _m_size = sizeInChar(strSize);
-
-    auto sizeInchars = 2 * static_cast<int>(std::ceil(_m_size));
+    _m_size = strSize;
+    auto sizeInchars = sizeInChar(_m_size);
 
     auto largestr = new char[strSize];
     _m_data = new char[sizeInchars];
@@ -34,7 +32,9 @@ BigNumber::BigNumber(int strSize, const char *s) {
     throw std::runtime_error("Illegal input !!, The input may not be a normal numeric type. ");
 }
 
-BigNumber::BigNumber(std::string s) { BigNumber(s.length(), s.data()); }
+BigNumber::BigNumber(std::string s) : BigNumber(s.length(), s.data()) {}
+
+BigNumber::BigNumber(char *s, int l) : _m_size(l), _m_data(s) {}
 
 BigNumber::BigNumber(long long l) : BigNumber(std::to_string(l)) {}
 // BigNumber::BigNumber(long long l) { new (this) BigNumber(std::to_string(l)); }
@@ -45,12 +45,6 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLengthInShorts
   auto targetDataInShorts = reinterpret_cast<unsigned short *>(targetData);
   auto finalTargetLengthInShorts = 1;
 
-  if (sourceLength == 1 && sourceData[0] == 0) {
-    targetDataInShorts = 0;
-    return true;
-  }
-
-  auto actualSourceLength = sourceLength;
   char *actualSourceData = sourceData;
 
   union {
@@ -62,10 +56,10 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLengthInShorts
   };
 
   int index = 0;
-  for (i = 0; i < actualSourceLength; i += 4) {
+  for (i = 0; i < sourceLength; i += 4) {
     unsigned short temp1 = 0;
     auto j = 0;
-    while ((j < 4) && (i + j < actualSourceLength)) {
+    while ((j < 4) && (i + j < sourceLength)) {
       temp1 = temp1 * 10 + actualSourceData[i + j];
       j++;
     }
@@ -96,16 +90,20 @@ bool BigNumber::ConvBcdToBigNumHelper(int sourceLength, int targetLengthInShorts
 }
 
 std::string BigNumber::ConvBigNumToBcdHelper() const {
-  auto targetLength = sizeInStr(_m_size);
+  auto targetLength = _m_size;
 
-  auto sourceLengthInShorts = static_cast<int>(std::ceil(_m_size));
-  auto targetData = new char[targetLength + 1];
+  auto sourceLengthInShorts = sizeInChar(_m_size) / 2;
+  auto targetData = new char[targetLength];
   auto sourceDataInShorts = reinterpret_cast<unsigned short *>(_m_data);
 
   auto tempSourceDataInShorts = new unsigned short[sourceLengthInShorts];
   std::copy(sourceDataInShorts, sourceDataInShorts + sourceLengthInShorts, tempSourceDataInShorts);
 
-  std::memset(targetData, 0, targetLength + 1);
+  auto actualSourceLengthInShorts = sourceLengthInShorts;
+  while (!tempSourceDataInShorts[actualSourceLengthInShorts - 1] && actualSourceLengthInShorts > 0)
+    actualSourceLengthInShorts--;
+
+  std::memset(targetData, 0, targetLength);
   char *finalTargetData = targetData + targetLength;
 
   // Ignore trailing zeros in the Big Num. If all zeros, return.
@@ -113,8 +111,6 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
     delete tempSourceDataInShorts;
     return "0";
   }
-
-  auto actualSourceLengthInShorts = sourceLengthInShorts;
 
   union {
     unsigned int temp;
@@ -161,17 +157,21 @@ std::string BigNumber::ConvBigNumToBcdHelper() const {
 
   delete tempSourceDataInShorts;
 
+  while (targetLength > 0) {
+    if (targetData[targetLength - 1] == 0) }
+
   for (auto i = 0; i < targetLength; i++) targetData[i] += '0';
 
-  std::cout << targetData << std::endl;
+  while (targetLength > 0) {
+    if (targetData[targetLength]) }
 
   return targetData;
 }
 
 BigNumber BigNumber::AddHelper(const BigNumber &adder) {
   // Recast from bytes to unsigned shorts.
-  auto sizeInStra = 2 * static_cast<int>(std::ceil(_m_size));
-  auto sizeInStrb = 2 * static_cast<int>(std::ceil(adder._m_size));
+  auto sizeInStra = sizeInChar(_m_size) / 2;
+  auto sizeInStrb = sizeInChar(adder._m_size) / 2;
   auto len = std::max(sizeInStra, sizeInStrb) + 2;
   auto data = new char[len];
   std::memset(data, 0, len);
@@ -203,8 +203,7 @@ BigNumber BigNumber::AddHelper(const BigNumber &adder) {
     resultDataInShorts[j] = tempParts.remainder;
   }
 
-  auto targetLength = sizeInStr(len / 2);
-  return BigNumber(len, data);
+  return BigNumber(data, std::max(_m_size, adder._m_size) + 1);
 }
 
 // BigNumber BigNumber::SubHelper(const BigNumber &suber) {
