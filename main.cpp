@@ -2,15 +2,22 @@
 
 #include "BigNumber.h"
 
+BigNumber getone() { return BigNumber("1234"); }
+
 int main() {
   // BigNumber a("65535");
-  BigNumber b("10100");
-  BigNumber a("10100");
+  // BigNumber b("10100");
+  // BigNumber a("101");
   // BigNumber c = a + b;
   // BigNumber d = a - b;
   // BigNumber e = a * b;
+  // 拷贝构造
+  // BigNumber c(a);
 
-  std::cout << (a == b) << std::endl;
+  // 赋值构造
+  // b = getone();
+
+  std::cout << "cout : " << BigNumber(100) + BigNumber(200) << std::endl;
 }
 
 /*
